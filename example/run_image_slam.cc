@@ -33,8 +33,8 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
     // load the mask image
     const cv::Mat mask = mask_img_path.empty() ? cv::Mat{} : cv::imread(mask_img_path, cv::IMREAD_GRAYSCALE);
 
-    const image_sequence sequence(image_dir_path, cfg->camera_->fps_);
-    const auto frames = sequence.get_frames();
+    image_sequence sequence(image_dir_path, cfg->camera_->fps_);
+    auto frames = sequence.get_frames();
 
     // build a SLAM system
     openvslam::system SLAM(cfg, vocab_file_path);
@@ -52,35 +52,47 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
 
     // run the SLAM in another thread
     std::thread thread([&]() {
-        for (unsigned int i = 0; i < frames.size(); ++i) {
-            const auto& frame = frames.at(i);
-            const auto img = cv::imread(frame.img_path_, cv::IMREAD_UNCHANGED);
+        while (true) {
+            for (unsigned int i = 0; i < frames.size(); ++i) {
+                const auto& frame = frames.at(i);
+                const auto img = cv::imread(frame.img_path_, cv::IMREAD_UNCHANGED);
 
-            const auto tp_1 = std::chrono::steady_clock::now();
+                const auto tp_1 = std::chrono::steady_clock::now();
 
-            if (!img.empty() && (i % frame_skip == 0)) {
-                // input the current frame and estimate the camera pose
-                SLAM.feed_monocular_frame(img, frame.timestamp_, mask);
-            }
+                if (!img.empty() && (i % frame_skip == 0)) {
+                    // input the current frame and estimate the camera pose
+                    SLAM.feed_monocular_frame(img, frame.timestamp_, mask);
+                }
 
-            const auto tp_2 = std::chrono::steady_clock::now();
+                const auto tp_2 = std::chrono::steady_clock::now();
 
-            const auto track_time = std::chrono::duration_cast<std::chrono::duration<double>>(tp_2 - tp_1).count();
-            if (i % frame_skip == 0) {
-                track_times.push_back(track_time);
-            }
+                const auto track_time = std::chrono::duration_cast<std::chrono::duration<double>>(tp_2 - tp_1).count();
+                if (i % frame_skip == 0) {
+                    track_times.push_back(track_time);
+                }
 
-            // wait until the timestamp of the next frame
-            if (!no_sleep && i < frames.size() - 1) {
-                const auto wait_time = frames.at(i + 1).timestamp_ - (frame.timestamp_ + track_time);
-                if (0.0 < wait_time) {
-                    std::this_thread::sleep_for(std::chrono::microseconds(static_cast<unsigned int>(wait_time * 1e6)));
+                /*/ wait until the timestamp of the next frame
+                if (!no_sleep && i < frames.size() - 1) {
+                    const auto wait_time = frames.at(i + 1).timestamp_ - (frame.timestamp_ + track_time);
+                    if (0.0 < wait_time) {
+                        std::this_thread::sleep_for(std::chrono::microseconds(static_cast<unsigned int>(wait_time * 1e6)));
+                    }
+                }
+                //*/
+
+                // check if the termination of SLAM system is requested or not
+                if (SLAM.terminate_is_requested()) {
+                    break;
                 }
             }
 
-            // check if the termination of SLAM system is requested or not
-            if (SLAM.terminate_is_requested()) {
-                break;
+            if (no_sleep || SLAM.terminate_is_requested()) break;
+            bool has_new = sequence.reload();
+            frames = sequence.get_frames();
+            if (!has_new) {
+                std::this_thread::sleep_for(std::chrono::microseconds(static_cast<unsigned int>(3e5)));
+            } else {
+                // std::cout << frames.at(0).timestamp_ << ": " << sequence.done_count << "+" << frames.size() << std::endl;
             }
         }
 

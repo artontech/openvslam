@@ -39,3 +39,22 @@ cmake-build-release/
 *.exe
 *.out
 *.app
+
+# Media
+*.png
+*.jpg
+*.mp4
+
+# Vocabulary
+*.dbow2
+
+# Output
+/output
+
+# Archive
+*.tar.bz2
+*.tar.gz
+*.zip
+
+# IDE
+/.vscode

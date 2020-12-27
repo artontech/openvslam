@@ -33,7 +33,7 @@ void mono_localization(const std::shared_ptr<openvslam::config>& cfg,
     // load the mask image
     const cv::Mat mask = mask_img_path.empty() ? cv::Mat{} : cv::imread(mask_img_path, cv::IMREAD_GRAYSCALE);
 
-    const image_sequence sequence(image_dir_path, cfg->camera_->fps_);
+    image_sequence sequence(image_dir_path, cfg->camera_->fps_);
     const auto frames = sequence.get_frames();
 
     // build a SLAM system

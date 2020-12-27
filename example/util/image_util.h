@@ -6,6 +6,8 @@
 
 class image_sequence {
 public:
+    size_t done_count = 0;
+    
     struct frame {
         frame(const std::string& img_path, const double timestamp)
             : img_path_(img_path), timestamp_(timestamp){};
@@ -18,10 +20,13 @@ public:
 
     virtual ~image_sequence() = default;
 
-    std::vector<frame> get_frames() const;
+    std::vector<frame> get_frames();
+
+    bool reload();
 
 private:
     const double fps_;
+    const std::string img_dir_path_;
 
     std::vector<std::string> img_file_paths_;
 };
